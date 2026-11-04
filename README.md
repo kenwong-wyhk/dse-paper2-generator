@@ -13,8 +13,9 @@ That's it. Nothing to install.
 
 ## What it does
 
-Every paper is 45 multiple-choice questions drawn at random from **14 years of real HKDSE
-Paper 2** (2012–2025, 630 questions). Each question keeps the position and topic where it
+Every paper is 45 multiple-choice questions drawn at random from a bank of
+**14 years of real HKDSE Paper 2** (2012–2025, 630 questions), plus any extra practice
+questions added since. Each question keeps the position and topic where it
 belongs, so the paper has the same shape as the real thing:
 
 - **Section A (Q1–Q30)** — algebra, geometry, mensuration, coordinate geometry, statistics
@@ -23,11 +24,21 @@ belongs, so the paper has the same shape as the real thing:
 
 No two papers are the same, so you can generate as many as you like.
 
+No topic appears more often than it ever did in a real paper — for example at most two
+polynomial questions, and at most one on the factor theorem — so a paper never turns into
+three variations of the same question.
+
 The answer key is always distributed like the real paper, but the letters move around:
 **Section A is always two 7s and two 8s** (for example 8/7/8/7, or 7/8/8/7, or 7/7/8/8),
 and **Section B is always one 3 and three 4s**. Which letter gets the larger count is
 reshuffled for every paper, so there is no pattern to spot. You can see the counts in the
 top-right corner after generating.
+
+## AI questions
+
+Some questions are written as variations of past-paper questions — same structure and same
+method, different numbers. They are marked with a small **AI** badge next to the question
+number, and the **Include AI questions** box in the toolbar lets you leave them out.
 
 ## The buttons
 
