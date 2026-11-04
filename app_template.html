@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HKDSE Maths Paper 2 — Mock Paper Generator</title>
+<style>
+  :root{
+    --ink:#16202e; --ink2:#4a5768; --mut:#5f6b7d; --line:#dde4ec;
+    --accent:#1f4e79; --soft:#f5f8fc;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:#eef2f7; color:var(--ink);
+    font-family:-apple-system,"Segoe UI",system-ui,"Helvetica Neue",sans-serif;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+
+  /* ---------- control bar ---------- */
+  .bar{
+    position:sticky; top:0; z-index:50; background:#fff;
+    border-bottom:1px solid var(--line); padding:12px 22px;
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    box-shadow:0 1px 3px rgba(20,40,70,.06);
+  }
+  .brand{font-weight:700; font-size:15px; letter-spacing:-.01em; margin-right:8px}
+  .brand span{color:var(--mut); font-weight:500; font-size:12.5px; display:block; letter-spacing:0}
+  button,select{
+    font:inherit; font-size:13.5px; padding:8px 15px; border-radius:7px;
+    border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
+  }
+  button:hover{border-color:#b9c6d6; background:#fafcff}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600}
+  button.primary:hover{background:#1a4267}
+  .spacer{margin-left:auto}
+  .hint{font-size:12px; color:var(--mut)}
+
+  /* ---------- paper ---------- */
+  .stage{padding:26px 16px 60px; display:flex; justify-content:center}
+  .paper{
+    width:210mm; min-height:297mm; background:#fff; padding:16mm 15mm;
+    box-shadow:0 2px 14px rgba(20,40,70,.10); border-radius:2px;
+  }
+  .head{text-align:center; margin-bottom:12mm}
+  .head h1{font-size:15pt; margin:0 0 2pt; letter-spacing:.02em}
+  .head h2{font-size:12pt; margin:0 0 3pt; font-weight:600}
+  .head .t{font-size:9.5pt; color:var(--ink2)}
+  .instr{font-size:9.5pt; line-height:1.5; margin:0 0 7mm; font-weight:600}
+  .sec{font-size:12pt; font-weight:700; margin:7mm 0 4mm; letter-spacing:.01em}
+  .sec.brk{break-before:page; page-break-before:always; margin-top:0}
+
+  .q{display:flex; gap:9px; margin-bottom:4.5mm; break-inside:avoid; page-break-inside:avoid}
+  .qn{flex:0 0 22px; text-align:right; font-size:10.5pt; font-weight:600; padding-top:1px}
+  .qb{flex:1 1 auto; min-width:0}
+  .qb img{max-width:100%; height:auto; display:block}
+
+  .end{text-align:center; font-weight:700; font-size:10pt; margin-top:10mm}
+
+  /* ---------- answer key ---------- */
+  .key{margin-top:10mm; break-before:page; page-break-before:always}
+  .key h3{font-size:11pt; text-align:center; margin:0 0 5mm}
+  .key table{border-collapse:collapse; margin:0 auto; font-size:10pt}
+  .key td,.key th{border:1px solid #9aa7b8; padding:2.5px 9px; text-align:center}
+  .key th{background:#f2f6fa; font-weight:600}
+  .hidden{display:none}
+
+  /* ---------- empty state ---------- */
+  .empty{text-align:center; color:var(--mut); padding:80px 20px}
+  .empty h2{color:var(--ink); font-size:20px; margin:0 0 8px}
+  .empty p{max-width:420px; margin:0 auto 22px; line-height:1.55; font-size:14px}
+
+  /* ---------- print ---------- */
+  @page{ size:A4; margin:14mm 14mm 12mm; }
+  @media print{
+    body{background:#fff}
+    .bar,.empty,.noprint{display:none !important}
+    .stage{padding:0; display:block}
+    .paper{width:auto; min-height:0; box-shadow:none; padding:0; border-radius:0}
+    .q{margin-bottom:3.6mm}
+    .sec{margin:5mm 0 3mm}
+  }
+</style>
+</head>
+<body>
+
+<div class="bar noprint">
+  <div class="brand">HKDSE Mathematics · Paper 2<span>Mock paper generator</span></div>
+  <select id="mode">
+    <option value="full">Full paper — 45 questions</option>
+    <option value="A">Section A only — 30 questions</option>
+    <option value="B">Section B only — 15 questions</option>
+  </select>
+  <button class="primary" id="gen">Generate new paper</button>
+  <button id="print">Print / Save as PDF</button>
+  <button id="ans">Show answers</button>
+  <span class="spacer"></span>
+  <span class="hint" id="stat"></span>
+</div>
+
+<div class="stage">
+  <div class="paper" id="paper">
+    <div class="empty">
+      <h2>Ready when you are</h2>
+      <p>Each paper is built from real HKDSE questions, drawn at random but kept in the
+      position and topic where they belong. No two papers are the same.</p>
+      <button class="primary" onclick="document.getElementById('gen').click()">Generate a paper</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/;
+
+/* ---------- the draw: mirrors the teacher-side generator ---------- */
+const LET = ['A','B','C','D'];
+
+/* Candidate pools, built once. Each entry is {q, w} where w combines how often the
+   question's topic really appears at that slot with how close its original position was. */
+const BASE = (() => {
+  const pools = {};
+  for (let slot = 1; slot <= 45; slot++){
+    const section = slot <= 30 ? 'A' : 'B';
+    const dist = DATA.slotDist[slot] || {};
+    const total = Object.values(dist).reduce((a,b)=>a+b, 0) || 1;
+    const list = [];
+    for (const q of DATA.questions){
+      if (q.s !== section) continue;
+      const f = dist[q.t] || 0;
+      if (!f) continue;
+      list.push({q, w: (f/total) / (1 + Math.pow(Math.abs(q.q - slot)/4, 2))});
+    }
+    pools[slot] = list;
+  }
+  return pools;
+})();
+
+function relaxedPool(slot){
+  const section = slot <= 30 ? 'A' : 'B';
+  const out = [];
+  for (const q of DATA.questions){
+    if (q.s !== section) continue;
+    out.push({q, w: 1 / (1 + Math.pow(Math.abs(q.q - slot)/4, 2))});
+  }
+  return out;
+}
+
+function pickWeighted(items){
+  let total = 0;
+  for (const it of items) total += it.w;
+  if (total <= 0) return items[Math.floor(Math.random()*items.length)];
+  let r = Math.random() * total;
+  for (const it of items){
+    r -= it.w;
+    if (r <= 0) return it;
+  }
+  return items[items.length-1];
+}
+
+/* One constrained attempt: every slot must find a question whose answer letter still
+   has room in that section's quota. Returns null if it paints itself into a corner. */
+function attemptDraw(slots, quotas){
+  const used = new Set();
+  const counts = {};
+  for (const s of Object.keys(quotas)) counts[s] = [0,0,0,0];
+  const picked = {};
+
+  const order = slots.slice().sort((a,b) =>
+    (BASE[a].length - BASE[b].length) || (Math.random() - 0.5));
+
+  for (const slot of order){
+    const sec = slot <= 30 ? 'A' : 'B';
+    const quota = quotas[sec];
+
+    const room = (it) => {
+      const i = LET.indexOf(it.q.a);
+      return !used.has(it.q.id) && counts[sec][i] < quota[i];
+    };
+
+    let cands = BASE[slot].filter(room);
+    if (!cands.length) cands = relaxedPool(slot).filter(room);
+    if (!cands.length) return null;
+
+    const chosen = pickWeighted(cands).q;
+    picked[slot] = chosen;
+    used.add(chosen.id);
+    counts[sec][LET.indexOf(chosen.a)]++;
+  }
+  return picked;
+}
+
+/* The quota is a multiset — two 7s and two 8s in Section A, one 3 and three 4s in
+   Section B — but which letters receive them is reshuffled for every paper, so the
+   key never settles into a fixed pattern. */
+function shuffleQuota(counts){
+  const a = counts.slice();
+  for (let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* Try several valid draws and keep the one closest to the original positions,
+   so the difficulty gradient survives the quota constraint. */
+function drawPaper(mode){
+  const conf = {
+    full: {slots: range(1,45), quotas: {A: shuffleQuota([7,7,8,8]), B: shuffleQuota([3,4,4,4])}},
+    A:    {slots: range(1,30), quotas: {A: shuffleQuota([7,7,8,8])}},
+    B:    {slots: range(31,45), quotas: {B: shuffleQuota([3,4,4,4])}}
+  }[mode];
+
+  let best = null, bestScore = Infinity;
+  for (let i = 0; i < 80; i++){
+    const p = attemptDraw(conf.slots, conf.quotas);
+    if (!p) continue;
+    let score = 0;
+    for (const s of conf.slots) score += Math.abs(p[s].q - s);
+    if (score < bestScore){ best = p; bestScore = score; }
+    if (score <= conf.slots.length * 1.1) break;   /* about one position of drift: good */
+  }
+  if (!best){                       /* quotas unreachable: fall back, never blank */
+    for (let i = 0; i < 40 && !best; i++){
+      best = attemptDraw(conf.slots, {A:[99,99,99,99], B:[99,99,99,99]});
+    }
+  }
+  return conf.slots.map(s => best[s]);
+}
+
+function range(a,b){ const r=[]; for(let i=a;i<=b;i++) r.push(i); return r; }
+
+function weightedPick(items, weights){
+  let total = 0;
+  for (const w of weights) total += w;
+  let r = Math.random() * total;
+  for (let i=0;i<items.length;i++){
+    r -= weights[i];
+    if (r <= 0) return items[i];
+  }
+  return items[items.length-1];
+}
+
+/* ---------- render ---------- */
+function render(picked, mode){
+  const paper = document.getElementById('paper');
+  const multi = mode === 'full';
+
+  let html = `
+    <div class="head">
+      <h1>HONG KONG DIPLOMA OF SECONDARY EDUCATION EXAMINATION</h1>
+      <h2>MATHEMATICS &nbsp;Compulsory Part &nbsp;PAPER 2</h2>
+      <div class="t">${mode === 'A' ? 'Section A' : mode === 'B' ? 'Section B'
+        : 'There are 30 questions in Section A and 15 questions in Section B'}</div>
+    </div>
+    <div class="instr">
+      The diagrams in this paper are not necessarily drawn to scale.<br>
+      Choose the best answer for each question.
+    </div>`;
+
+  if (multi) html += `<div class="sec">Section A</div>`;
+
+  picked.forEach((q, i) => {
+    if (multi && q.s === 'B' && picked[i-1] && picked[i-1].s === 'A'){
+      html += `<div class="sec brk">Section B</div>`;
+    }
+    const num = multi ? (q.s === 'A' ? i+1 : i+1) : i+1;
+    html += `<div class="q"><div class="qn">${num}.</div>
+             <div class="qb"><img src="questions/${q.id}.svg" alt="Question ${num}"></div></div>`;
+  });
+
+  html += `<div class="end">END OF PAPER</div>`;
+
+  /* answer key, hidden until asked for */
+  html += `<div class="key hidden" id="key"><h3>ANSWER KEY</h3><table>`;
+  const per = Math.ceil(picked.length / 3);
+  for (let r = 0; r < per; r++){
+    html += '<tr>';
+    for (let c = 0; c < 3; c++){
+      const idx = c*per + r;
+      if (idx < picked.length){
+        const n = idx + 1;
+        html += `<td>${n}</td><td><b>${picked[idx].a}</b></td>`;
+      } else html += '<td></td><td></td>';
+    }
+    html += '</tr>';
+  }
+  html += `</table></div>`;
+
+  paper.innerHTML = html;
+
+  const da = {A:0,B:0,C:0,D:0}, db = {A:0,B:0,C:0,D:0};
+  picked.forEach(q => (q.s === 'A' ? da : db)[q.a]++);
+  const fmt = d => `${d.A}/${d.B}/${d.C}/${d.D}`;
+  const parts = [];
+  if (mode !== 'B') parts.push(`Section A ${fmt(da)}`);
+  if (mode !== 'A') parts.push(`Section B ${fmt(db)}`);
+  document.getElementById('stat').textContent =
+    `${picked.length} questions · ${parts.join(' · ')}`;
+  document.getElementById('ans').textContent = 'Show answers';
+}
+
+/* ---------- wiring ---------- */
+let current = null, mode = 'full';
+
+document.getElementById('gen').onclick = () => {
+  mode = document.getElementById('mode').value;
+  current = drawPaper(mode);
+  render(current, mode);
+  window.scrollTo({top:0, behavior:'smooth'});
+};
+
+document.getElementById('print').onclick = () => window.print();
+
+document.getElementById('ans').onclick = (e) => {
+  const key = document.getElementById('key');
+  if (!key) return;
+  key.classList.toggle('hidden');
+  e.target.textContent = key.classList.contains('hidden') ? 'Show answers' : 'Hide answers';
+};
+
+document.getElementById('mode').onchange = () => {
+  if (current) document.getElementById('gen').click();
+};
+
+/* open with a paper already generated: #demo, or #demo-answers to show the key too */
+if (location.hash.startsWith('#demo')){
+  document.getElementById('gen').click();
+  if (location.hash.includes('answers')) document.getElementById('ans').click();
+}
+</script>
+</body>
+</html>
